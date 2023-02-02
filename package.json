@@ -4,6 +4,7 @@
   "description": "Off chain relayer for the token bridge",
   "main": "index.js",
   "scripts": {
+    "start": "ts-node src/main.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -20,7 +21,7 @@
   },
   "dependencies": {
     "@certusone/wormhole-sdk": "^0.9.9",
-    "@wormhole-foundation/relayer-engine": "github:wormhole-foundation/relayer-engine",
+    "@wormhole-foundation/relayer-engine": "github:wormhole-foundation/relayer-engine#e361e4774d0a7d24cf817bcb2a5dbda187bf6626",
     "ethers": "^5.7.2",
     "winston": "^3.8.2"
   }

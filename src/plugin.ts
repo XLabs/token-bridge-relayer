@@ -83,7 +83,6 @@ export class TokenBridgeRelayerPlugin implements Plugin<WorkflowPayload> {
     vaa: ParsedVaaWithBytes,
     stagingArea: StagingAreaKeyLock,
     providers: Providers,
-    extraData?: any[] | undefined
   ): Promise<{ workflowData: WorkflowPayload; workflowOptions?: WorkflowOptions } | undefined> {
     const payload3 = wh.parseTokenTransferPayload(vaa.payload);
     if (payload3.payloadType !== wh.TokenBridgePayload.TransferWithPayload) {
