@@ -1,0 +1,24 @@
+{
+  "logLevel": "debug",
+  "storeType": "Redis",
+  "readinessPort": 2000,
+  "numGuardians": 1,
+  "redis": {
+    "port": 6379,
+    "host": "localhost"
+  },
+  "defaultWorkflowOptions": {
+    "maxRetries": 10
+  },
+  "wormholeRpc": "https://wormhole-v2-testnet-api.certus.one",
+  "supportedChains": [
+    {
+      "chainId": 6,
+      "chainName": "Fuji",
+      "nodeUrl": "https://api.avax-test.network/ext/bc/C/rpc",
+      "tokenBridgeAddress": "0x61E44E506Ca5659E6c0bba9b678586fA2d729756",
+      "bridgeAddress": "0x7bbcE28e64B3F8b84d876Ab298393c38ad7aac4C",
+      "wrappedAsset": "0x1D308089a2D1Ced3f1Ce36B1FcaF815b07217be3"
+    }
+  ]
+}

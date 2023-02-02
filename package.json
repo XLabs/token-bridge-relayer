@@ -1,0 +1,27 @@
+{
+  "name": "token-bridge-relayer",
+  "version": "1.0.0",
+  "description": "Off chain relayer for the token bridge",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "wormhole",
+    "token-bridge",
+    "relayer"
+  ],
+  "author": "Gabriel Zimmermann",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/winston": "^2.4.4",
+    "prettier": "^2.8.3",
+    "ts-node": "^10.9.1"
+  },
+  "dependencies": {
+    "@certusone/wormhole-sdk": "^0.9.9",
+    "@wormhole-foundation/relayer-engine": "github:wormhole-foundation/relayer-engine",
+    "ethers": "^5.7.2",
+    "winston": "^3.8.2"
+  }
+}
