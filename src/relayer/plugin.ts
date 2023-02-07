@@ -1,7 +1,6 @@
 import { Logger } from "winston";
 import {
   ActionExecutor,
-  assertBool,
   CommonPluginEnv,
   ContractFilter,
   ParsedVaaWithBytes,
@@ -12,31 +11,25 @@ import {
   WorkflowOptions,
 } from "@wormhole-foundation/relayer-engine";
 import * as wh from "@certusone/wormhole-sdk";
-import {
-  ChainId,
-  TokenTransfer,
-  tryNativeToHexString,
-  tryUint8ArrayToNative,
-  uint8ArrayToHex,
-} from "@certusone/wormhole-sdk";
+import { ChainId, tryNativeToHexString, tryUint8ArrayToNative, uint8ArrayToHex } from "@certusone/wormhole-sdk";
 import { Contract, ethers } from "ethers";
-import { IERC20Metadata__factory } from "@certusone/wormhole-sdk/lib/cjs/ethers-contracts";
-import { ITokenBridge__factory } from "@certusone/wormhole-sdk/lib/cjs/ethers-contracts";
+import { IERC20Metadata__factory, ITokenBridge__factory } from "@certusone/wormhole-sdk/lib/cjs/ethers-contracts";
 import { ChainAddresses, SupportedChainId, TokenBridgeRelayerPluginConfig } from "./config";
 
+// This is the workflow.data field generated from consumeEvent
 export interface WorkflowPayload {
   toChain: SupportedChainId;
   targetRelayerAddress: string;
   localTokenAddressOnTargetChain: string;
   denormalizedToNativeAmount: string;
-  vaaHex: string;
+  vaaHex: string; // includes 0x
 }
 
 export interface TransferWithRelay {
   payloadId: number; // == 1  // uint8
   targetRelayerFee: ethers.BigNumber; // uint256
   toNativeTokenAmount: ethers.BigNumber; // uint256
-  targetRecipient: string; // bytes32 wormhole hex formatted addr
+  targetRecipient: string; // bytes32 as wormhole hex formatted addr
 }
 
 export class TokenBridgeRelayerPlugin implements Plugin<WorkflowPayload> {
@@ -64,13 +57,13 @@ export class TokenBridgeRelayerPlugin implements Plugin<WorkflowPayload> {
 
   getFilters(): ContractFilter[] {
     return Array.from(this.pluginConfig.addressMap.entries()).map(([chainId, addresses]) => ({
-      emitterAddress: addresses.relayer,
+      emitterAddress: addresses.bridge,
       chainId,
     }));
   }
 
   constructor(
-    readonly engineConfig: CommonPluginEnv,
+    readonly _: CommonPluginEnv,
     pluginConfig: TokenBridgeRelayerPluginConfig,
     private readonly logger: Logger
   ) {
@@ -82,38 +75,38 @@ export class TokenBridgeRelayerPlugin implements Plugin<WorkflowPayload> {
   async consumeEvent(
     vaa: ParsedVaaWithBytes,
     stagingArea: StagingAreaKeyLock,
-    providers: Providers,
+    providers: Providers
   ): Promise<{ workflowData: WorkflowPayload; workflowOptions?: WorkflowOptions } | undefined> {
+    // 1. Parse Token Bridge VAA Payload
     const payload3 = wh.parseTokenTransferPayload(vaa.payload);
     if (payload3.payloadType !== wh.TokenBridgePayload.TransferWithPayload) {
+      // we only accept v3 payloads
       return;
     }
-    const relayerPayload = parseRelayerPayload(payload3.tokenTransferPayload);
 
     let fromChain = vaa.emitterChain as SupportedChainId;
-    const fromAddress = ethers.utils.getAddress(tryUint8ArrayToNative(payload3.fromAddress!, fromChain));
     const toChain = payload3.toChain as SupportedChainId;
+    const fromAddress = ethers.utils.getAddress(tryUint8ArrayToNative(payload3.fromAddress!, fromChain));
     const toAddress = ethers.utils.getAddress(tryUint8ArrayToNative(payload3.to, toChain)); // check, does the address come in wh native format? if so is this necessary?
 
     let sourceRelayerAddress = this.pluginConfig.addressMap.get(fromChain)!.relayer;
     let targetRelayerAddress = this.pluginConfig.addressMap.get(toChain)!.relayer;
 
-    //1. Check that it's coming from our relayer and going to our relayer.
-    if (toAddress !== targetRelayerAddress) {
-      this.logger.warn(`Unknown target contract: ${toAddress} for chainId: ${toChain}, terminating relay.`);
-      return;
-    }
-
+    //2. Check the VAA was generated from our relayer and is going to our relayer
     if (fromAddress != sourceRelayerAddress) {
       this.logger.warn(`Unknown sender: ${fromAddress} for chainId: ${fromChain}, terminating relay.`);
       return;
     }
 
+    if (toAddress !== targetRelayerAddress) {
+      this.logger.warn(`Unknown target contract: ${toAddress} for chainId: ${toChain}, terminating relay.`);
+      return;
+    }
+
+    // 3. fetch the local token address on the target chain
     const tokenChain = payload3.tokenChain as SupportedChainId;
     const tokenAddress = ethers.utils.getAddress(tryUint8ArrayToNative(payload3.tokenAddress, toChain));
-
     const tokenBridge = tokenBridgeContract(this.pluginConfig.addressMap.get(toChain)!.bridge, providers.evm[toChain]);
-    // 2. fetch the local token address on the target chain
     const localTokenAddressOnTargetChain = await getLocalTokenAddress(
       tokenBridge,
       toChain as SupportedChainId,
@@ -122,10 +115,10 @@ export class TokenBridgeRelayerPlugin implements Plugin<WorkflowPayload> {
     );
 
     // 3. fetch the token decimals
-    const erc20Meta = IERC20Metadata__factory.connect(localTokenAddressOnTargetChain, providers.evm[toChain]);
-    const tokenDecimals = await erc20Meta.decimals();
+    const tokenDecimals = await getTokenDecimals(localTokenAddressOnTargetChain, providers.evm[toChain]);
 
     // 4. Denormalize amount (wh denormalizes to 8 decimals)
+    const relayerPayload = parseRelayerPayload(payload3.tokenTransferPayload);
     const denormalizedToNativeAmount = tokenBridgeDenormalizeAmount(
       ethers.BigNumber.from(relayerPayload.toNativeTokenAmount),
       tokenDecimals
@@ -159,21 +152,18 @@ export class TokenBridgeRelayerPlugin implements Plugin<WorkflowPayload> {
 
           // fetch weth address from the contract
           const targetWethAddress = ethers.utils.getAddress(await relayer.WETH());
-          let nativeSwapQuote: ethers.BigNumber;
-          if (targetWethAddress === localTokenAddressOnTargetChain) {
-            console.log("WETH transfer detected, setting nativeSwapQuote to zero.");
-            nativeSwapQuote = ethers.BigNumber.from("0");
-          } else {
-            nativeSwapQuote = await relayer.calculateNativeSwapAmountOut(
-              localTokenAddressOnTargetChain,
-              denormalizedToNativeAmount
-            );
+          let nativeSwapQuote = ethers.BigNumber.from("0"); // We only want to change this if targetWethAddress !== localTokenAddressOnTargetChain
+          let maxNativeSwapAllowed: ethers.BigNumber;
+          if (targetWethAddress !== localTokenAddressOnTargetChain) {
+            // Fetch the max native swap amount from the contract.
+            [nativeSwapQuote, maxNativeSwapAllowed] = await Promise.all([
+              relayer.calculateNativeSwapAmountOut(localTokenAddressOnTargetChain, denormalizedToNativeAmount),
+              relayer.maxNativeSwapAmount(localTokenAddressOnTargetChain),
+            ]);
 
-            // Fetch the max native swap amount from the contract. Override
-            // the nativeSwapQuote with the max if the maxNativeSwapAllowed
+            // Override the nativeSwapQuote with the max if the maxNativeSwapAllowed
             // is less than the nativeSwapQuote. This will reduce the cost
             // of the transaction.
-            const maxNativeSwapAllowed = await relayer.maxNativeSwapAmount(localTokenAddressOnTargetChain);
             if (maxNativeSwapAllowed.lt(nativeSwapQuote)) {
               nativeSwapQuote = maxNativeSwapAllowed;
             }
@@ -191,6 +181,12 @@ export class TokenBridgeRelayerPlugin implements Plugin<WorkflowPayload> {
       this.logger.error(e);
     }
   }
+}
+
+async function getTokenDecimals(tokenAddress: string, provider: ethers.providers.Provider): Promise<number> {
+  const erc20Meta = IERC20Metadata__factory.connect(tokenAddress, provider);
+  const tokenDecimals = await erc20Meta.decimals();
+  return tokenDecimals;
 }
 
 async function getLocalTokenAddress(
