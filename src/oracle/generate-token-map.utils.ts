@@ -1,21 +1,21 @@
 import pricingOracleConfig from "../../cfg/price-oracle.testnet";
 import { SUPPORTED_CHAINS, SupportedChainId } from "../relayer/config";
-import { tokenBridgeContracts, TokenInfo } from "./config";
+import { config, TokenInfo } from "./config";
 import { ethers } from "ethers";
 import { tryUint8ArrayToNative } from "@certusone/wormhole-sdk";
 import { ZERO_ADDRESS } from "./main";
 
-async function generateTokenMap(config: TokenInfo[]) {
+async function generateTokenMap(tokenInfos: TokenInfo[]) {
   // native -> local token address
   const addressMap = <Record<SupportedChainId, Record<string, string>>>{};
 
   for (const chainId of SUPPORTED_CHAINS) {
     // instantiate token bridge contract
-    const tokenBridge: ethers.Contract = tokenBridgeContracts[chainId];
+    const tokenBridge: ethers.Contract = config.tokenBridgeContracts[chainId];
 
     const nativeToLocalTokenMap = <Record<string, string>>{};
 
-    for (const tokenConfig of config) {
+    for (const tokenConfig of tokenInfos) {
       const token = ethers.utils.arrayify("0x" + tokenConfig.tokenContract);
       const tokenChain = tokenConfig.chainId;
 

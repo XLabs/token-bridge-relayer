@@ -1,14 +1,9 @@
 import { ethers } from "ethers";
-import {
-  assertPricePrecisionSetOrThrow,
-  relayerContracts,
-  SUPPORTED_CHAINS,
-  supportedTokenIds,
-  TokenInfo,
-} from "./config";
+import { assertPricePrecisionSetOrThrow, config, SUPPORTED_CHAINS, supportedTokenIds, TokenInfo } from "./config";
 import pricingOracleConfig from "../../cfg/price-oracle.testnet.js";
 import nativeTokenMap from "../../cfg/token_addr-to-local-addr.priceoracle.testnet";
 import { getCoingeckoPrices } from "./coingecko";
+import * as winston from "winston";
 
 require("dotenv").config();
 
@@ -20,14 +15,20 @@ async function sleepFor(ms: number): Promise<void> {
 }
 
 async function main() {
+  const logger = winston.createLogger({
+    level: config.logLevel,
+    format: config.env != "local" ? winston.format.json() : winston.format.cli(),
+    defaultMeta: { service: "token-bridge-price-oracle" },
+    transports: [new winston.transports.Console()],
+  });
   const tokens = supportedTokenIds;
-  console.log(`Coingecko Id string: ${tokens.join(",")}`);
+  logger.info(`Coingecko Id string: ${tokens.join(",")}`);
 
   const { fetchPricesInterval, minPriceChangePercentage, maxPriceChangePercentage } = pricingOracleConfig;
 
-  console.log(`New price update interval: ${fetchPricesInterval}`);
-  console.log(`Price update minimum percentage change: ${minPriceChangePercentage}%`);
-  console.log(`Price update maximum percentage change: ${maxPriceChangePercentage}%`);
+  logger.info(`New price update interval: ${fetchPricesInterval}`);
+  logger.info(`Price update minimum percentage change: ${minPriceChangePercentage}%`);
+  logger.info(`Price update maximum percentage change: ${maxPriceChangePercentage}%`);
 
   // confirm the price precision on each contract
   await assertPricePrecisionSetOrThrow(pricingOracleConfig.pricePrecision);
@@ -38,7 +39,7 @@ async function main() {
     const coingeckoPrices = await getCoingeckoPrices(tokens).catch((_) => null);
 
     if (coingeckoPrices === null) {
-      console.error("Failed to fetch coingecko prices!");
+      logger.error("Failed to fetch coingecko prices!");
       continue;
     }
 
@@ -53,7 +54,7 @@ async function main() {
       // update contract prices for each supported chain / token
       for (const supportedChainId of SUPPORTED_CHAINS) {
         // set up relayer contract
-        const relayer = relayerContracts[supportedChainId];
+        const relayer = config.relayerContracts[supportedChainId];
 
         for (const config of pricingOracleConfig.supportedTokens) {
           // @ts-ignore
@@ -68,7 +69,7 @@ async function main() {
           // compute percentage change
           const percentageChange = ((newPrice.toNumber() - currentPrice.toNumber()) / currentPrice.toNumber()) * 100;
 
-          console.log(
+          logger.info(
             `Price update, chainId: ${supportedChainId}, nativeAddress: ${config.tokenContract}, localTokenAddress: ${token}, currentPrice: ${currentPrice}, newPrice: ${newPrice}`
           );
 
@@ -76,7 +77,7 @@ async function main() {
             const pricePercentageChange = Math.abs(percentageChange);
 
             if (pricePercentageChange >= maxPriceChangePercentage) {
-              console.warn(
+              logger.warn(
                 `Price change larger than max, chainId: ${supportedChainId}, token: ${token}. Skipping update.`
               );
               continue;
@@ -87,18 +88,18 @@ async function main() {
               // if (minPriceChangePercentage ≤ pricePercentageChange ≤ maxPriceChangePercentage)
               const tx = await relayer.updateSwapRate(supportedChainId, token, newPrice);
               const receipt = await tx.wait();
-              console.log(
+              logger.info(
                 `Updated native price on chainId: ${supportedChainId}, token: ${token}, txhash: ${receipt.transactionHash}`
               );
             }
           } catch (e) {
-            console.log(`Failed to update the swap rate`);
-            console.error(e);
+            logger.error(`Failed to update the swap rate`);
+            logger.error(e);
           }
         }
       }
     } catch (e) {
-      console.error(e);
+      logger.error(e);
     }
     await sleepFor(fetchPricesInterval);
   }
