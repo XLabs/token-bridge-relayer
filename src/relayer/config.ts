@@ -23,7 +23,6 @@ export type SupportedChainId = (typeof SUPPORTED_CHAINS)[number];
 export interface ChainAddresses {
   bridge: string;
   relayer: string;
-  wormhole: string;
 }
 
 export interface TokenBridgeRelayerPluginConfig {

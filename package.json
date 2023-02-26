@@ -4,8 +4,10 @@
   "description": "Off chain relayer for the token bridge",
   "main": "index.js",
   "scripts": {
-    "start": "ts-node src/main.ts",
+    "start": "ts-node src/relayer/main.ts",
+    "oracle": "ts-node src/oracle/main.ts",
     "build": "tsc",
+    "generate-token-map": "ts-node src/oracle/generate-token-map.utils.ts 2>cfg/token_addr-to-local-addr.priceoracle.testnet.json",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -22,8 +24,10 @@
   },
   "dependencies": {
     "@certusone/wormhole-sdk": "^0.9.9",
+    "@types/node": "^18.14.0",
     "@wormhole-foundation/relayer-engine": "github:wormhole-foundation/relayer-engine#e361e4774d0a7d24cf817bcb2a5dbda187bf6626",
     "ethers": "^5.7.2",
+    "typescript": "^4.9.5",
     "winston": "^3.8.2"
   }
 }

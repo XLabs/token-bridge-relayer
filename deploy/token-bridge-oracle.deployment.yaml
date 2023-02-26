@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: relayer
+  namespace: token-bridge-relayer
+  labels:
+    app: oracle
+spec:
+  selector:
+    matchLabels:
+      app: relayer
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: relayer
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: relayer
+          image:  581679387567.dkr.ecr.us-east-2.amazonaws.com/token-bridge-relayer:0.0.1
+          imagePullPolicy: Always
+          # uncomment to explore filesystem during crash loop
+          #        command: [ "/bin/sh", "-c", "--" ]
+          #        args: [ "while true; do sleep 30; done;" ]
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 600Mi
+            limits:
+              cpu: 1000m
+              memory: 2000Mi
+          volumeMounts:
+            - name: token-bridge-relayer-configs
+              mountPath: /usr/src/app/cfg
+          envFrom:
+            - secretRef:
+                name: private-keys
+                optional: false
+      volumes:
+        - name: relayer-engine-config
+          configMap:
+            name: relayer-engine-config
+        - name: token-bridge-relayer-configs
+          configMap:
+            name: token-bridge-relayer-configs

@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: token-bridge-relayer
+resources:
+  - token-bridge-relayer.deployment.yaml
+configMapGenerator:
+- name: relayer-engine-config
+  files:
+  - k8s-testnet/common.json
+  - k8s-testnet/executor.json
+  - k8s-testnet/listener.json
+- name: token-bridge-relayer-configs
+  files:
+    - k8s-testnet/both/addresses.both.json
+    - k8s-testnet/oracle/supported-tokens.oracle.json
+    - k8s-testnet/oracle/token-addr-to-local-addr.oracle.json

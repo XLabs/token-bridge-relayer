@@ -1,15 +1,9 @@
 import { ethers } from "ethers";
-import { assertPricePrecisionSetOrThrow, config, SUPPORTED_CHAINS, supportedTokenIds, TokenInfo } from "./config";
-import pricingOracleConfig from "../../cfg/price-oracle.testnet.js";
-import nativeTokenMap from "../../cfg/token_addr-to-local-addr.priceoracle.testnet";
+import { assertPricePrecisionSetOrThrow, config, SUPPORTED_CHAINS, TokenInfo } from "./config";
 import { getCoingeckoPrices } from "./coingecko";
 import * as winston from "winston";
 
 require("dotenv").config();
-
-// zero address
-export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-
 async function sleepFor(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -21,17 +15,24 @@ async function main() {
     defaultMeta: { service: "token-bridge-price-oracle" },
     transports: [new winston.transports.Console()],
   });
-  const tokens = supportedTokenIds;
+  const tokens = config.supportedTokenIds;
   logger.info(`Coingecko Id string: ${tokens.join(",")}`);
 
-  const { fetchPricesInterval, minPriceChangePercentage, maxPriceChangePercentage } = pricingOracleConfig;
+  const {
+    supportedTokens,
+    fetchPricesInterval,
+    minPriceChangePercentage,
+    maxPriceChangePercentage,
+    pricePrecision,
+    relayerContracts,
+  } = config;
 
   logger.info(`New price update interval: ${fetchPricesInterval}`);
   logger.info(`Price update minimum percentage change: ${minPriceChangePercentage}%`);
   logger.info(`Price update maximum percentage change: ${maxPriceChangePercentage}%`);
 
   // confirm the price precision on each contract
-  await assertPricePrecisionSetOrThrow(pricingOracleConfig.pricePrecision);
+  await assertPricePrecisionSetOrThrow(pricePrecision);
 
   // get er done
   while (true) {
@@ -45,22 +46,18 @@ async function main() {
 
     try {
       // format price updates
-      const priceUpdates = formatPriceUpdates(
-        pricingOracleConfig.supportedTokens,
-        coingeckoPrices,
-        pricingOracleConfig.pricePrecision
-      );
+      const priceUpdates = formatPriceUpdates(supportedTokens, coingeckoPrices, pricePrecision);
 
       // update contract prices for each supported chain / token
       for (const supportedChainId of SUPPORTED_CHAINS) {
         // set up relayer contract
-        const relayer = config.relayerContracts[supportedChainId];
+        const relayer = relayerContracts[supportedChainId];
 
-        for (const config of pricingOracleConfig.supportedTokens) {
+        for (const supportedToken of supportedTokens) {
           // @ts-ignore
           // local token address in supportedChainId
-          const token = nativeTokenMap[supportedChainId][config.tokenContract];
-          const tokenId = config.tokenId;
+          const token = supportedTokens[supportedChainId][supportedToken.tokenContract];
+          const tokenId = supportedToken.tokenId;
 
           // query the contract to fetch the current native swap price
           const currentPrice: ethers.BigNumber = await relayer.swapRate(token);
@@ -70,7 +67,7 @@ async function main() {
           const percentageChange = ((newPrice.toNumber() - currentPrice.toNumber()) / currentPrice.toNumber()) * 100;
 
           logger.info(
-            `Price update, chainId: ${supportedChainId}, nativeAddress: ${config.tokenContract}, localTokenAddress: ${token}, currentPrice: ${currentPrice}, newPrice: ${newPrice}`
+            `Price update, chainId: ${supportedChainId}, nativeAddress: ${supportedToken.tokenContract}, localTokenAddress: ${token}, currentPrice: ${currentPrice}, newPrice: ${newPrice}`
           );
 
           try {

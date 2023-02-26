@@ -1,0 +1,16 @@
+FROM node:18.3.0 as builder
+
+WORKDIR /usr/src/app
+COPY --chown=node:node package.json package-lock.json ./
+RUN npm pkg delete scripts.prepare && npm ci
+COPY --chown=node:node . .
+RUN npm run build
+
+FROM node:lts-alpine3.17 as final
+WORKDIR /usr/src/app
+COPY --chown=node:node --from=builder /usr/src/app/node_modules  ./node_modules
+COPY --chown=node:node --from=builder /usr/src/app/lib /usr/src/app/package*.json /usr/src/app/  ./
+#RUN npm pkg delete scripts.prepare && npm ci --only=production
+USER node
+EXPOSE 3000
+CMD ["node", "src/oracle/main.js"]

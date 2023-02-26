@@ -44,7 +44,6 @@ export class TokenBridgeRelayerPlugin implements Plugin<WorkflowPayload> {
     for (const [chainId, addresses] of Object.entries(rawConfig)) {
       chainAddresses.set(Number(chainId) as SupportedChainId, {
         bridge: ethers.utils.getAddress(addresses.bridge),
-        wormhole: ethers.utils.getAddress(addresses.wormhole),
         relayer: ethers.utils.getAddress(addresses.relayer),
       });
     }

@@ -1,9 +1,10 @@
-import pricingOracleConfig from "../../cfg/price-oracle.testnet";
+import supportedTokens from "../../cfg/supported-tokens.oracle.json";
 import { SUPPORTED_CHAINS, SupportedChainId } from "../relayer/config";
 import { config, TokenInfo } from "./config";
 import { ethers } from "ethers";
 import { tryUint8ArrayToNative } from "@certusone/wormhole-sdk";
-import { ZERO_ADDRESS } from "./main";
+
+export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 async function generateTokenMap(tokenInfos: TokenInfo[]) {
   // native -> local token address
@@ -47,8 +48,8 @@ async function generateTokenMap(tokenInfos: TokenInfo[]) {
 }
 
 async function main() {
-  let map = await generateTokenMap(pricingOracleConfig.supportedTokens);
-  console.log(JSON.stringify(map, null, 2));
+  let map = await generateTokenMap(supportedTokens);
+  console.error(JSON.stringify(map, null, 2));
 }
 
 main();

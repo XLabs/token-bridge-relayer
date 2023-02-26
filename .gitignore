@@ -1,6 +1,9 @@
 .idea
 **/pkeys.sh
+.env
+
 
 relayer-token-bridge.iml
 
 node_modules/
+lib/

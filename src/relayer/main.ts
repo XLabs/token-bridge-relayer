@@ -4,7 +4,7 @@ import { TokenBridgeRelayerDefinition, TokenBridgeRelayerPluginConfig, pluginDef
 async function main() {
   // load plugin config
   const pluginConfig = (await relayerEngine.loadFileAndParseToObject(
-    `./cfg/token-bridge-plugin.testnet.json`
+    `./cfg/addresses.both.json`
   )) as TokenBridgeRelayerPluginConfig;
 
   const mode = (process.env.RELAYER_ENGINE_MODE?.toUpperCase() as relayerEngine.Mode) || relayerEngine.Mode.BOTH;

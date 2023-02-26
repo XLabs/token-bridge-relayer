@@ -1,7 +1,7 @@
 const axios = require("axios"); // import breaks
 
 export async function getCoingeckoPrices(tokens: string[] | string) {
-  tokens = typeof tokens === "string" ? [tokens] : tokens.join(",");
+  tokens = typeof tokens === "string" ? tokens : tokens.join(",");
   const { data, status } = await axios.get(
     `https://api.coingecko.com/api/v3/simple/price?ids=${tokens}&vs_currencies=usd`,
     {
@@ -12,7 +12,7 @@ export async function getCoingeckoPrices(tokens: string[] | string) {
   );
 
   if (status != 200) {
-    return Promise.reject("status != 200");
+    throw new Error("status != 200");
   }
 
   return data;
